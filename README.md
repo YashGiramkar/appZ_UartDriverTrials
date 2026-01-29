@@ -4,21 +4,18 @@ Contains a zephyr sample application to test sample UART driver.
 ## Explaining the structure
 The currently used UART driver uses UART3 from NUCLEO-F413ZH.
 The same UART that is configured as a debug and console UART.
+
 Currenlty we are using the CONFIG_UART_INTERRUPT_DRIVEN kconfig which uses a simplified version on UART driver.
+
 Alternatively, we may also use CONFIG_UART_ASYNC_API in kconfig, this uses DMA for UART data transmission and reception.
+
 Using CONFIG_UART_ASYNC_API should be used when:
-✅ High data rate (e.g. >500 kbps)
-✅ Continuous RX streams
-✅ Want DMA, minimal ISR load
-✅ Comfortable with event-driven design
+- ✅ High data rate (e.g. >500 kbps)
+- ✅ Continuous RX streams
+- ✅ Want DMA, minimal ISR load
+- ✅ Comfortable with event-driven design
 
 ### Comparison (at a glance)
-
-	Low	High
-CPU load	Medium	Low
-DMA
-	Safe	❌
-Shell / printk	Perfect	Overkill
 
 | Feature   | IRQ API  | ASYNC API  |
 |:---------:|:--------:|:----------:|
