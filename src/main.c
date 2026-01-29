@@ -5,8 +5,6 @@
 
 
 #define SLEEP_TIME_IN_MS                     500
-#define RECEIVE_BUFF_SIZE                    10
-#define RECEIVE_TIMEOUT                      100
 
 
 #define LED_NODE0                            DT_ALIAS(led0)
@@ -21,42 +19,57 @@ static const struct gpio_dt_spec led2 = GPIO_DT_SPEC_GET(LED_NODE2, gpios);
 
 static const struct device *uart= DEVICE_DT_GET(DT_NODELABEL(usart3));
 
-static uint8_t tx_buf[] =   {"Working on Zephyr Fundamental course\r\n"
+static const uint8_t tx_buf[] =   {"Working on Zephyr Fundamental course\r\n"
    "Press 1-3 on your keyboard to toggle LEDS 1-3 on your Nucleo-F413ZH development kit\r\n"};
 
-static uint8_t rx_buf[RECEIVE_BUFF_SIZE] = {0};
+static const uint8_t rx_mismatched_buf[] =   {"Invalid Number for LED opearation\r\n"};
 
-static void uart_cb(const struct device *dev, struct uart_event *evt, void *user_data)
+
+static void uart_send_string(const struct device *dev, const char *str)
 {
-   switch (evt->type)
-   {
-
-      case UART_RX_RDY:
-         if ((evt->data.rx.len) == 1) {
-
-            if (evt->data.rx.buf[evt->data.rx.offset] == '1')
-            {
-               gpio_pin_toggle_dt(&led0);
-            }
-            else if (evt->data.rx.buf[evt->data.rx.offset] == '2')
-            {
-               gpio_pin_toggle_dt(&led1);
-            }
-            else if (evt->data.rx.buf[evt->data.rx.offset] == '3')
-            {
-               gpio_pin_toggle_dt(&led2);
-            }
-         }
-         break;
-      case UART_RX_DISABLED:
-         uart_rx_enable(dev, rx_buf, sizeof rx_buf, RECEIVE_TIMEOUT);
-         break;
-
-      default:
-         break;
-   }
+    while (*str) {
+        uart_poll_out(dev, *str++);
+    }
 }
 
+
+static void uart_cb(const struct device *dev, void *user_data)
+{
+   uint8_t byte;
+
+   if (!uart_irq_update(dev))
+   {
+      return;
+   }
+
+   while (uart_irq_rx_ready(dev))
+   {
+
+      if (uart_fifo_read(dev, &byte, 1) == 1)
+      {
+         /* Optional: echo back */
+         uart_fifo_fill(dev, &byte, 1);
+
+         if(byte == '1')
+         {
+            gpio_pin_toggle_dt(&led0);
+         }
+         else if(byte == '2')
+         {
+            gpio_pin_toggle_dt(&led1);
+         }
+         else if(byte == '3')
+         {
+            gpio_pin_toggle_dt(&led2);
+         }
+         else
+         {
+            printk("%s", &rx_mismatched_buf[0]);
+         }
+
+      }
+   }
+}
 
 
 int main()
@@ -87,21 +100,25 @@ int main()
    }
 
    // Register UART callback
-   ret = uart_callback_set(uart, uart_cb, NULL);
+   // ret = uart_callback_set(uart, uart_cb, NULL);
+   // if (ret) {
+   //    return 1;
+   // }
+   ret = uart_irq_callback_user_data_set(uart, uart_cb, NULL);
    if (ret) {
       return 1;
    }
+   printk("UART Callback setting successful\r\n");
 
    // Transmit some data on UART
-   ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
-   if (ret) {
-      return 1;
-   }
+   // ret = uart_tx(uart, tx_buf, sizeof(tx_buf), SYS_FOREVER_US);
+   uart_send_string(uart, tx_buf);
 
-   ret = uart_rx_enable(uart ,rx_buf,sizeof rx_buf,RECEIVE_TIMEOUT);
-   if (ret) {
-      return 1;
-   }
+   printk("UART Tx successful\r\n");
+
+   uart_irq_rx_enable(uart);
+
+   printk("UART Rx Enbled\r\n");
 
    while(1)
    {
